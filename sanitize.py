@@ -5,7 +5,9 @@ import csv
 mem_store = Shove()
 root = Shove('file://shovestore')
 
+
 def parse(filename):
+  print 'Parsing', filename
   n, e = filename.split('.')
   with open(filename, 'rb') as csvfile:
     reader = csv.reader(csvfile)
@@ -19,7 +21,7 @@ def parse(filename):
       for index, name in enumerate(names):
         key = name if index is 0 else (n+'.'+name)
         o[key] = row[index]
-      print o
+      print date,len(o.keys())
 
 
 parse('BAVERAGE-USD.csv')

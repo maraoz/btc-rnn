@@ -6,5 +6,7 @@ mem_store = Shove()
 root = Shove('file://shovestore')
 
 
-print root['2009-04-08']
+print sorted(root.keys())
+print root['2009-01-03']
+print root['2016-01-03']
 
