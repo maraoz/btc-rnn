@@ -26,20 +26,23 @@ class DataLoader():
     def preprocess(self, root, tensor_file):
         dates = sorted(root.keys())
         prices = []
-        print dates
         for date in dates:
           price = float(root[date].get('BAVERAGE-USD.24h Average') or 0)
           prices.append(price)
-        print prices
         self.tensor = np.array(prices)
+        print 'prices shape', len(self.tensor), self.tensor.size
         np.save(tensor_file, self.tensor)
 
     def load_preprocessed(self, tensor_file):
         self.tensor = np.load(tensor_file)
-        self.num_batches = self.tensor.size / (self.batch_size * self.seq_length)
+
 
     def create_batches(self):
         self.num_batches = self.tensor.size / (self.batch_size * self.seq_length)
+        print('num_batches =', self.num_batches)
+        print('self.tensor.size =', self.tensor.size)
+        print('self.batch_size =', self.batch_size)
+        print('self.seq_length =', self.seq_length)
         self.tensor = self.tensor[:self.num_batches * self.batch_size * self.seq_length]
         xdata = self.tensor
         ydata = np.copy(self.tensor)

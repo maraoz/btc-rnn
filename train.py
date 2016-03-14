@@ -21,9 +21,9 @@ def main():
                        help='number of layers in the RNN')
     parser.add_argument('--model', type=str, default='lstm',
                        help='rnn, gru, or lstm')
-    parser.add_argument('--batch_size', type=int, default=50,
+    parser.add_argument('--batch_size', type=int, default=51,
                        help='minibatch size')
-    parser.add_argument('--seq_length', type=int, default=50,
+    parser.add_argument('--seq_length', type=int, default=13,
                        help='RNN sequence length')
     parser.add_argument('--num_epochs', type=int, default=50,
                        help='number of epochs')
@@ -56,8 +56,11 @@ def train(args):
             for b in xrange(data_loader.num_batches):
                 start = time.time()
                 x, y = data_loader.next_batch()
+                print('x shape', len(x))
+                print('y shape', len(y))
                 feed = {model.input_data: x, model.targets: y, model.initial_state: state}
-                train_loss, state, _ = sess.run([model.cost, model.final_state, model.train_op], feed)
+                train_loss, state, _ = sess.run(\
+                        [model.cost, model.final_state, model.train_op], feed)
                 end = time.time()
                 print "{}/{} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}" \
                     .format(e * data_loader.num_batches + b,
