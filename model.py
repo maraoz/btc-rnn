@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.models.rnn import rnn_cell
 from tensorflow.models.rnn import seq2seq
+from tensorflow.python.ops import rnn
 
 import numpy as np
 
@@ -25,75 +26,68 @@ class Model():
 
         self.cell = cell = rnn_cell.MultiRNNCell([one_cell] * args.num_layers)
 
-        self.input_data = tf.placeholder(tf.int32, [args.batch_size, args.seq_length])
-        print('input_data shape', self.input_data.get_shape())
-        self.targets = tf.placeholder(tf.int32, [args.batch_size, self.args.seq_length])
+        self.input_data = tf.placeholder(tf.float32, \
+                [args.batch_size, args.seq_length])
+        self.targets = tf.placeholder(tf.float32, \
+                [args.batch_size, args.seq_length])
         self.initial_state = cell.zero_state(args.batch_size, tf.float32)
 
-        with tf.variable_scope('rnnlm'):
-            softmax_w = tf.get_variable("softmax_w", [args.rnn_size, self.args.data_dim])
-            softmax_b = tf.get_variable("softmax_b", [self.args.data_dim])
-            with tf.device("/cpu:0"):
-                embedding = tf.get_variable("embedding", [self.args.data_dim, args.rnn_size])
-                inputs = tf.split(1, args.seq_length, \
-                        tf.nn.embedding_lookup(embedding, self.input_data))
-                inputs = [tf.squeeze(input_, [1]) for input_ in inputs]
+        inputs = tf.split(1, args.seq_length, self.input_data)
 
-        def loop(prev, _):
-            prev = tf.nn.xw_plus_b(prev, softmax_w, softmax_b)
-            prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
-            return tf.nn.embedding_lookup(embedding, prev_symbol)
-
-        outputs, last_state = seq2seq.rnn_decoder(inputs, \
-                self.initial_state, cell, \
-                loop_function=loop if infer else None, scope='rnnlm')
-        output = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
-        self.logits = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
-        self.probs = tf.nn.softmax(self.logits)
-        flat_targets = tf.reshape(self.targets, [-1])
-        ones = tf.ones([args.batch_size * args.seq_length])
-        print(self.logits)
-        print(flat_targets)
-        print(ones)
-        loss = seq2seq.sequence_loss_by_example([self.logits],
-                [flat_targets],
-                [ones])
-                #args.vocab_size)
-        self.cost = tf.reduce_sum(loss) / args.batch_size / args.seq_length
+        outputs, last_state = \
+                rnn.rnn(cell, inputs, self.initial_state,
+                        dtype=tf.float32)
         self.final_state = last_state
-        self.lr = tf.Variable(0.0, trainable=False)
+
+        output = tf.reshape(tf.concat(1, outputs), [-1, args.rnn_size])
+
+        softmax_w = tf.get_variable("softmax_w", \
+                [args.rnn_size, self.args.data_dim])
+        softmax_b = tf.get_variable("softmax_b", \
+                [self.args.data_dim])
+
+        self.logits = tf.nn.xw_plus_b(output, softmax_w, softmax_b)
+
+        flat_targets = tf.reshape(self.targets, [-1])
+        print(self.logits)
+        print(self.targets)
+        self.cost = tf.reduce_sum(tf.pow(self.logits-flat_targets, 2))/ \
+                (2*(args.batch_size*args.seq_length)) #L2 loss
+        print(self.cost)
+        self.lr = tf.Variable(args.learning_rate, trainable=False)
         tvars = tf.trainable_variables()
         grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars),
                 args.grad_clip)
-        optimizer = tf.train.AdamOptimizer(self.lr)
+        #optimizer = tf.train.AdamOptimizer(self.lr)
+        #optimizer = tf.train.GradientDescentOptimizer(self.lr)
+        optimizer = tf.train.AdagradOptimizer(self.lr)
+
         self.train_op = optimizer.apply_gradients(zip(grads, tvars))
 
-    def sample(self, sess, chars, vocab, num=200, prime='The '):
+    def sample(self, sess, num=200, prime=[0.0]):
         state = self.cell.zero_state(1, tf.float32).eval()
-        for char in prime[:-1]:
+        for price in prime[:-1]:
             x = np.zeros((1, 1))
-            x[0, 0] = vocab[char]
+            x[0, 0] = price
             feed = {self.input_data: x, self.initial_state:state}
-            [state] = sess.run([self.final_state], feed)
-
-        def weighted_pick(weights):
-            t = np.cumsum(weights)
-            s = np.sum(weights)
-            return(int(np.searchsorted(t, np.random.rand(1)*s)))
+            [state, logits] = \
+                    sess.run([self.final_state, self.logits], feed)
+            #print price, logits
 
         ret = prime
-        char = prime[-1]
+        price = prime[-1]
         for n in xrange(num):
             x = np.zeros((1, 1))
-            x[0, 0] = vocab[char]
+            x[0, 0] = price
             feed = {self.input_data: x, self.initial_state:state}
-            [probs, state] = sess.run([self.probs, self.final_state], feed)
-            p = probs[0]
-            # sample = int(np.random.choice(len(p), p=p))
-            sample = weighted_pick(p)
-            pred = chars[sample]
-            ret += pred
-            char = pred
+            [logits, state] = \
+                    sess.run([self.logits, self.final_state], feed)
+            print logits
+            import sys; sys.exit();
+            pred = logits
+            ret += [pred]
+            price = pred
         return ret
+
 
 

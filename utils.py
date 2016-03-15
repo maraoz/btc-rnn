@@ -24,10 +24,12 @@ class DataLoader():
         self.reset_batch_pointer()
 
     def preprocess(self, root, tensor_file):
+        print 'preprocessing...'
         dates = sorted(root.keys())
         prices = []
         for date in dates:
-          price = float(root[date].get('BAVERAGE-USD.24h Average') or 0)
+          sp = root[date].get('bitfinexUSD.price')
+          price = float(sp)
           prices.append(price)
         self.tensor = np.array(prices)
         print 'prices shape', len(self.tensor), self.tensor.size
